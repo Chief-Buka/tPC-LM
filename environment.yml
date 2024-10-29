@@ -1,0 +1,17 @@
+name: tpc
+channels:
+  - defaults
+dependencies:
+  - python=3.11
+  - pytorch
+  - pytorch-cuda=12.4
+  - torchaudio
+  - torchvision
+  - nltk
+  - numpy
+  - gensim
+  - spacy
+  - pandas
+  - datasets
+  - tokenizers
+prefix: /om2/user/cohams/miniconda3/envs/tpc
