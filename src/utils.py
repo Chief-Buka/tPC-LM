@@ -6,7 +6,37 @@ import spacy
 import pandas as pd
 from tqdm import tqdm
 import gensim.downloader
+import numpy as np
 
+UNK_TOKEN = "[UNK]"
+PAD_TOKEN = "[PAD]"
+
+
+def load_embeddings(filepath):
+    # can check a list of default embeddings vs loading in trained local embeddings
+    embeddings = gensim.downloader.load(filepath)
+    embeddings[UNK_TOKEN] = np.ones(300)*1e-6  
+    embeddings[PAD_TOKEN] = np.ones(300)*1e-6  
+    return embeddings 
+
+
+
+def encode_batch(batch, key2index, tokenizer):
+    # ids for each token in each sentence
+    batch_ids = [tokenizer.encode(sentence).ids for sentence in batch["sentence"]]
+    # max sentence length for the batch
+    max_batch_len = max(len(ids) for ids in batch_ids)
+    # tuple (ids, mask) per sentence for ids with padding to longest sentence in batch
+    padded_batch_ids_and_masks = [
+        (ids+[key2index[PAD_TOKEN]]*(max_batch_len - len(ids)),
+        [1]*len(ids) + [0]*(max_batch_len - len(ids))) for ids in batch_ids
+    ]
+    #TODO: zero mask the [UNK] tokens
+    # separate into 2d lists of ids and masks
+    padded_batch_ids, masks = list(zip(*padded_batch_ids_and_masks))
+    batch["padded_batch_ids"] = padded_batch_ids
+    batch["masks"] = masks
+    return batch
 
 
 def get_brown():
@@ -19,6 +49,7 @@ def get_brown():
     def clean_token(token):
         token = re.sub("n't", "not", token)
         token = re.sub("'m", "am", token)
+        token = re.sub("'re", "are", token)
         token = re.sub("[^a-zA-Z0-9]", "", token).lower()
         return token
 

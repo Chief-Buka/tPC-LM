@@ -1,44 +1,14 @@
-from models import AutoTPC
+from models import TPC
 import argparse
 import gensim.downloader
 import numpy as np
 from tokenizers import Tokenizer, models, pre_tokenizers
 from datasets import load_dataset
 import torch
+from tqdm import tqdm
+from utils import load_embeddings, encode_batch, UNK_TOKEN
+import pdb
 
-UNK_TOKEN = "[UNK]"
-PAD_TOKEN = "[PAD]"
-
-
-def load_embeddings(filepath):
-    # can check a list of default embeddings vs loading in trained local embeddings
-    embeddings = gensim.downloader.load(filepath)
-    embeddings[UNK_TOKEN] = np.ones(300)*1e-6  
-    embeddings[PAD_TOKEN] = np.ones(300)*1e-6  
-    return embeddings 
-
-
-
-def encode_batch(batch, key2index, tokenizer):
-    # ids for each token in each sentence
-    batch_ids = [tokenizer.encode(sentence).ids for sentence in batch["sentence"]]
-
-    # mac sentence length for the batch
-    max_batch_len = max(len(ids) for ids in batch_ids)
-
-    # tuple (ids, mask) per sentence for ids with padding to longest sentence in batch
-    padded_batch_ids_and_masks = [
-        (ids+[key2index[PAD_TOKEN]]*(max_batch_len - len(ids)),
-        [1]*len(ids) + [0]*(max_batch_len - len(ids))) for ids in batch_ids
-    ]
-
-    # separate into 2d lists of ids and masks
-    padded_batch_ids, masks = list(zip(*padded_batch_ids_and_masks))
-
-    batch["padded_batch_ids"] = np.array(padded_batch_ids).T 
-    batch["masks"] = torch.BoolTensor(masks).T
-
-    return batch
 
 
 
@@ -48,25 +18,36 @@ def run_helper(model, data, embeddings, tokenizer, mode):
     data = data.map(
         encode_batch, 
         batched=False, 
-        fn_kwargs={"tokenizer": tokenizer, "key2index": embeddings.key_to_index}
+        fn_kwargs={"tokenizer": tokenizer, "key2index": embeddings.key_to_index},
+
     )
 
+    energy = 0.0
+
     # iterate over batches
-    for batch_num, batch in tqdm(enumerate(train_data)):
+    for batch_num, batch in tqdm(enumerate(data)):
+
+        batch_ids = np.array(batch["padded_batch_ids"]).T #(max_sent_len, batch_size)
+        batch_masks = torch.BoolTensor(batch["masks"]).T #(max_sent_len, batch_size)
+
+        model.batch_size = batch_ids.shape[1]
         model.reset(reset_state=True, reset_error=True)
         model.set_random_prev()
 
+        batch_energy = 0.0
+
         # iterate over token ids and masks
-        for k, (ids, mask) in enumerate(zip(batch["padded_batch_ids"], batch["masks"])):
-            model.y = torch.Tensor(embeddings[ids]).to(model.device) #shape=(batch_size,embd_dim)
-            model.mask = torch.BoolTensor(mask).to(model.device) #shape=batch_size
+        for k, (ids, masks) in enumerate(zip(batch_ids, batch_masks)):
+            model.y = torch.Tensor(embeddings[ids]).to(model.device).T #shape=(embd_dim, batch_size)
+            model.mask = masks.to(model.device) #shape=batch_size
 
             # Infer the hidden statee
-            for _ in range(model.inf_iters):
-                model.step()
+            pdb.set_trace()
+            for t in range(model.inf_iters):
+                model.step(t)
 
             # Compute end of inference energy
-            energy += model.compute_energy().cpu().numpy()
+            batch_energy += model.compute_energy().cpu().numpy()
 
             if mode == "train":
                 # Update model parameters
@@ -74,41 +55,49 @@ def run_helper(model, data, embeddings, tokenizer, mode):
 
             # Update previous state and observation
             model.update_prev()
+        energy += batch_energy
+        #print(batch_energy)
 
     if mode == "train":
         output = {"model": model, "energy": energy}
     elif mode == "val":
         output = {"energy": energy}
 
+    return output
 
-def run(model, embeddings, dataset, tokenizer, epochs, savedir):
+
+def run(model, embeddings, dataset, tokenizer, args):
     train_data = dataset["train"]
     val_data = dataset["val"]
 
     best_validation_energy = float('inf')
 
-    for epoch in range(epochs):
+    for epoch in range(args.epochs):
 
         # train
-        train_output = run_helper(model, data, embeddings, tokenizer, mode="train")
+        train_output = run_helper(model, train_data, embeddings, tokenizer, mode="train")
         print(f"Train Energy: {train_output['energy']:.3f}")
         model = train_output["model"]
+        model.batch_size = args.batch_size
 
         # validation
-        val_output = run_helper(model, data, embeddings, tokenizer, mode="val")
+        model.batch_size = args.batch_size
+        val_output = run_helper(model, val_data, embeddings, tokenizer, mode="val")
         print(f"Validation Energy: {val_output['energy']:.3f}")
+        model.batch_size = args.batch_size
 
         # save model parameters if current parameters are better than current
         if val_output["energy"] < best_validation_energy:
-            model.save_parameters(epoch, energy, savedir)
+            model.save_parameters(epoch, val_output["energy"], args.savedir)
+            best_validation_energy = val_output["energy"]
 
 
 
 
 
 def main(args):
-    print("Initializing model...")
-    model = AutoTPC(
+    print("Initializing model...", end="")
+    model = TPC(
         autoregressive=args.autoregressive,
         y_size=args.y_size,
         x_size=args.x_size,
@@ -119,40 +108,46 @@ def main(args):
         error_units=args.error_units,
         device=args.device
     )
+    print(model)
 
-    print("Loading embeddings...")
-    embeddings = load_embeddings(args.embedding_path)
+    print("done\nLoading embeddings...", end="")
+    if args.embedding_path == "word2vec":
+        embeddings_path = "word2vec-google-news-300"
+    elif args.embedding_path == "glove":
+        embeddings_path = "glove-wiki-gigaword-300"
+    embeddings = load_embeddings(embeddings_path)
 
-    print("Loading dataset")
+    print("done\nLoading dataset...", end="")
     tokenizer = Tokenizer(models.WordLevel(embeddings.key_to_index, UNK_TOKEN))
     tokenizer.pre_tokenizer = pre_tokenizers.Whitespace()
     dataset = load_dataset("csv", data_files={"train":args.train_data_path, "val":args.val_data_path})
+    print("done\nStarting training...")
 
-    print("Starting training...")
     run(
         model=model, 
         embeddings=embeddings, 
         dataset=dataset,
         tokenizer=tokenizer,
-        epochs=args.epochs,
-        savedir=args.savedir
+        args=args
     )
+    print("Finished training!")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--autoregressive", type=bool, required=True)
+    parser.add_argument("--autoregressive", action="store_true")
     parser.add_argument("--y_size", type=int, required=True)
     parser.add_argument("--x_size", type=int, required=True)
     parser.add_argument("--batch_size", type=int, required=True)
     parser.add_argument("--inf_iters", type=int, required=True)
     parser.add_argument("--delta_t_x", type=float, required=True)
     parser.add_argument("--delta_t_w", type=float, required=True)
-    parser.add_argument("--error_units", type=float, default=False)
+    parser.add_argument("--error_units", action='store_true')
     parser.add_argument("--device", type=str, default="cpu")
-    parser.add_argument("--embedding_path", type=str, default="word2vec-google-news-300")
+    parser.add_argument("--embedding_path", type=str, default="glove")
     parser.add_argument("--train_data_path", type=str, required=True)
     parser.add_argument("--val_data_path", type=str, required=True)
     parser.add_argument("--epochs", type=int, default=50)
-    parser.add_argument("--savedir", type=str, default="./")
-    args = parser.parse_args()
-    main(args)
+    parser.add_argument("--savedir", type=str, default="../results")
+    parser.add_argument("--normalize", action='store_true')
+    arguments = parser.parse_args()
+    main(arguments)
