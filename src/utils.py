@@ -38,6 +38,13 @@ def encode_batch(batch, key2index, tokenizer):
     batch["masks"] = masks
     return batch
 
+def clean_token(token):
+    token = re.sub("n't", "not", token)
+    token = re.sub("'m", "am", token)
+    token = re.sub("'re", "are", token)
+    token = re.sub("[^a-zA-Z0-9]", "", token).lower()
+    return token
+
 
 def get_brown():
     id2sent_raw = dict()
@@ -45,13 +52,6 @@ def get_brown():
     id_count = 0
     model = spacy.load("en_core_web_sm")
     nltk.download('brown') # get data if not already available
-
-    def clean_token(token):
-        token = re.sub("n't", "not", token)
-        token = re.sub("'m", "am", token)
-        token = re.sub("'re", "are", token)
-        token = re.sub("[^a-zA-Z0-9]", "", token).lower()
-        return token
 
     for sentence in tqdm(brown.sents()):
         doc = model(" ".join(sentence))
@@ -100,3 +100,84 @@ def split_brown(split):
     train_data.to_csv("./corpora/brown/train_brown.csv", index=False)
     val_data.to_csv("./corpora/brown/val_brown.csv", index=False)
     test_data.to_csv("./corpora/brown/test_brown.csv", index=False)
+
+
+def get_dundee():
+    df = pd.read_csv("metrics_full.csv")
+    id2sent = dict()
+    id_count = 0
+    tokens = []
+    for index, row in df.iterrows():
+        if row["sentence_num"] != id_count:
+            id2sent[id_count] = " ".join(tokens)
+            id_count += 1
+            tokens = []
+        tokens.append(clean_token(row["original_tokens"]))
+
+    id2sent[id_count] = " ".join(tokens)
+        
+    id2sent_df = pd.DataFrame.from_dict({
+        "id": id2sent.keys(),
+        "sentence": id2sent.values()
+    })
+    id2sent_df.to_csv("./corpora/dundee/dundee.csv", index=False)
+
+
+def get_appleseed():
+    all_tokens = []
+    segment_nums = []
+    sent_nums = []
+    token_nums = []
+    sent_num = 0
+    token_num = 0
+    id2sent = dict()
+    segments = [f"{i+1}" for i in range(11)] + ['11b']
+    for seg in segments:
+        with open(f"./appleseed_text/appleseed{seg}.txt", "r") as f:
+            for line in f.readlines():
+                sent = []
+                tokens = line.split()
+                if len(tokens) > 0:
+                    for token in tokens:
+                        all_tokens.append(clean_token(token))
+                        sent.append(all_tokens[-1])
+                        segment_nums.append(seg)
+                        sent_nums.append(sent_num)
+                        token_nums.append(token_num)
+                        token_num += 1
+                    sent_num += 1
+                    id2sent[sent_num] = " ".join(sent)
+
+    id2sent_df = pd.DataFrame.from_dict({
+        "id": id2sent.keys(),
+        "sentence": id2sent.values()
+    })
+
+    tokens_df = pd.DataFrame({
+        "tokens": all_tokens,
+        "segment_num": segment_nums,
+        "sentence_num": sent_nums,
+        "token_num": token_nums
+    })
+
+    id2sent_df.to_csv("./corpora/appleseed.csv", index=False)
+    tokens_df.to_csv("./appleseed_base.csv", index=False)
+
+
+def get_natural_stories():
+    df = pd.read_csv("natural_stories_rts.csv")
+    id2sent = dict()
+    id_count = 0
+    tokens = []
+    for index, row in df.iterrows():
+        tokens.append(clean_token(row["token"]))
+        if "." in row["token"]:
+            id2sent[id_count] = " ".join(tokens)
+            id_count += 1
+            tokens = []
+
+    id2sent_df = pd.DataFrame.from_dict({
+        "id": id2sent.keys(),
+        "sentence": id2sent.values()
+    })
+    id2sent_df.to_csv("./corpora/natural_stories.csv", index=False)
