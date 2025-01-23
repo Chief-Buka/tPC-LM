@@ -64,14 +64,14 @@ def update_batch_metrics(batch_metrics, model, tokenizer, ids, gradient, top_dow
 
             cosdist_prior_v_posterior = 1.0 - cosine_similarity(model.pred_x[:,b], model.x[:,b], dim=0).item() # prior x_k vs posterior x_k
             cosdist_posterior_v_posterior = 1.0 - cosine_similarity(model.prev_x[:,b], model.x[:,b], dim=0).item() # posterior x_{k-1} vs posterior x_k
-            cosdist_posterior_v_prior = 1.0 - cosine_similarity(model.prev_x[:,b], model.pred_x[:,b], dim=0).item() # posterior x_{k-1} vs prior x_k
-
+            
+            z = torch.linalg.lstsq(model.Wxy, (model.y[:,b] - model.by[:,0])).solution
             if model.g_type == "linear":
-                x_likelihood = torch.linalg.lstsq(model.Wxy, (model.y[:,b] - model.by[:,0])).solution
-                cosdist_likelihood_v_posterior = 1.0 - cosine_similarity(x_likelihood, model.x[:,b], dim=0).item() # likelihood x_k vs posterior x_k
-                cosdist_prior_v_likelihood = 1.0 - cosine_similarity(model.pred_x[:,b], x_likelihood, dim=0).item() # prior x_k vs likelihood x_k
-                cosdist_posterior_v_likelihood = 1.0 - cosine_similarity(model.prev_x[:,b], x_likelihood, dim=0).item() # posterior x_{k-1} vs likelihood x_k
-
+                x_likelihood = z
+            elif model.g_type == "leaky_relu":
+                x_likelihood = torch.where(z >= 0, z, z/model.negative_slope)
+            cosdist_likelihood_v_posterior = 1.0 - cosine_similarity(x_likelihood, model.x[:,b], dim=0).item() # likelihood x_k vs posterior x_k
+                
             output = kl_divergence(model, b, mode="bayesian-surprise")
             bayesian_surprise = output["kl_div"]
             free_energy = (
@@ -94,16 +94,12 @@ def update_batch_metrics(batch_metrics, model, tokenizer, ids, gradient, top_dow
                 "cosdist_y": cosdist_y,
                 "cosdist_prior_v_posterior": cosdist_prior_v_posterior,
                 "cosdist_posterior_v_posterior": cosdist_posterior_v_posterior,
-                "cosdist_posterior_v_prior": cosdist_posterior_v_prior,
+                "cosdist_likelihood_v_posterior": cosdist_likelihood_v_posterior,
                 "bayesian_surprise": bayesian_surprise,
                 "iters": times[b].item()+1,
                 "normed_gradient": normed_gradient[:iters, b],
                 "model_token": token
             })
-            if model.g_type == "linear":
-                batch_metrics[b][-1][f"cosdist_likelihood_v_posterior"] = cosdist_likelihood_v_posterior
-                batch_metrics[b][-1][f"cosdist_prior_v_likelihood"] = cosdist_prior_v_likelihood
-                batch_metrics[b][-1][f"cosdist_posterior_v_likelihood"] = cosdist_posterior_v_likelihood
             for k in range(model.K):
                 batch_metrics[b][-1][f"wnorm_yx{k}"] = torch.linalg.norm(model.batched_delta_Wyx[k][b]).item()
 
@@ -201,14 +197,12 @@ def main(args):
     print(model)
 
     print("done\nLoading embeddings and dataset...", end="")
-    if args.embedding_path == "word2vec":
-        embeddings_path = "word2vec-google-news-300"
-    elif args.embedding_path == "glove":
+    if args.embedding_path == "glove":
         embeddings_path = "glove-wiki-gigaword-300"
     embeddings = load_embeddings(embeddings_path)
     
     tokenizer = Tokenizer(models.WordLevel(embeddings.key_to_index, UNK_TOKEN))
-    tokenizer.pre_tokenizer = pre_tokenizers.Whitespace()
+    tokenizer.pre_tokenizer = pre_tokenizers.WhitespaceSplit()
     dataset = load_dataset("csv", data_files=args.corpus_path)
     print("done\nStarting training...")
 
@@ -234,9 +228,9 @@ if __name__ == "__main__":
     disable_caching()
     parser = ArgumentParser()
     parser.add_argument("--model_path", type=str)
-    parser.add_argument("--max_inf_iters", type=int, default=300)
+    parser.add_argument("--max_inf_iters", type=int, default=2000) #300
     parser.add_argument("--K", type=int, default=0)
-    parser.add_argument("--delta_t_x", type=float, default=3e-2)
+    parser.add_argument("--delta_t_x", type=float, default=1e-2) #3e-2
     parser.add_argument("--threshold", type=float, default=1e-3)
     parser.add_argument("--start_at_prediction", action="store_true")
     parser.add_argument("--error_units", action="store_true")

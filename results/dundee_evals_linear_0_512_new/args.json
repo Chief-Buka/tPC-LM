@@ -1,0 +1,1 @@
+{"model_path": "../results/trained_models_linear_0_512_new/epoch_199.pt", "max_inf_iters": 2000, "K": 0, "delta_t_x": 0.01, "threshold": 0.001, "start_at_prediction": false, "error_units": false, "batch_size": 64, "corpus_path": "./corpora/dundee.csv", "savedir": "../results/dundee_evals_linear_0_512_new", "embedding_path": "glove"}
