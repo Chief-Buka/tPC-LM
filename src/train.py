@@ -1,4 +1,4 @@
-from models import TPC, AutoTPC
+from models import AutoTPC
 import argparse
 import gensim.downloader
 import numpy as np
