@@ -1,6 +1,7 @@
 from typing import Tuple, List, Dict, Optional
 import pandas as pd
 import numpy as np
+import matplotlib
 import scipy
 from pygam import GAM, LinearGAM, s, te
 from pygam.terms import TermList
@@ -88,6 +89,17 @@ def fit_gam(df : pd.DataFrame, predictor_name : str, num_spillover : int,
     if return_predictors:
         return gam, predictors
     return gam
+
+def plot_gam(model : GAM, original_values : pd.Series, predictor_name : str, 
+             ax : matplotlib.axes._axes.Axes, y_bounds : Tuple, corpus_name : str):
+    XX = model.generate_X_grid(term=0)
+    pdep, confi = model.partial_dependence(term=0, X=XX, width=0.95)
+    unstandardized = (XX[:,0] * np.std(original_values) + np.mean(original_values))
+    ax.plot(unstandardized, pdep)
+    ax.plot(unstandardized, confi, c='r', ls='--')
+    print(np.mean(confi[:,1] - confi[:,0]))
+    ax.set(xlabel = predictor_name, ylabel = f"Slowdown in RT due to {predictor_name}", ylim = y_bounds, title = corpus_name)
+
 
 def calc_loglik(model, test_x, train_x, train_y, test_y):
     standardizer = StandardScaler()
