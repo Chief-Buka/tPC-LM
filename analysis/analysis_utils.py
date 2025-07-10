@@ -40,11 +40,11 @@ def run_crossval(indices : Tuple[List, List], df : pd.DataFrame, predictor_list 
             num_spillover = 0
             if "surprisal" in predictor:
                 num_spillover = surprisal_spillover
-            model, predictor_names = fit_gam(df, predictor, num_spillover = num_spillover, return_predictors = True, linear = is_linear, baseline = False)
+            model, predictor_names = fit_gam(training_data, predictor, num_spillover = num_spillover, return_predictors = True, linear = is_linear, baseline = False)
             training_data = training_data[predictor_names + ['RT']].dropna()
             test_data = test_data[predictor_names + ['RT']].dropna()
             train_x, train_y, test_x, test_y = np.array(training_data[predictor_names]), np.array(training_data['RT']), np.array(test_data[predictor_names]), np.array(test_data['RT'])
-            baseline = fit_gam(df, predictor, num_spillover = num_spillover, return_predictors = False, linear = is_linear, baseline = True)
+            baseline = fit_gam(training_data, predictor, num_spillover = num_spillover, return_predictors = False, linear = is_linear, baseline = True)
             delta_loglik[predictor].append((calc_loglik(model, test_x, train_x, train_y, test_y) \
                                             - calc_loglik(baseline, test_x, train_x, train_y, test_y)))
         print(f"Average Delta LogLik: {np.mean(delta_loglik[predictor])}")
@@ -100,10 +100,10 @@ def plot_gam(model : GAM, original_values : pd.Series, predictor_name : str,
     print(np.mean(confi[:,1] - confi[:,0]))
     ax.set(xlabel = predictor_name, ylabel = f"Slowdown in RT due to {predictor_name}", ylim = y_bounds, title = corpus_name)
 
-
 def calc_loglik(model, test_x, train_x, train_y, test_y):
     standardizer = StandardScaler()
-    train_x, test_x = standardizer.fit_transform(train_x), standardizer.fit_transform(test_x)
+    standardizer.fit(train_x)
+    train_x, test_x = standardizer.transform(train_x), standardizer.transform(test_x)
     predictions = model.predict(test_x)
     residuals = train_y - model.predict(train_x)
     stdev = np.std(residuals)
