@@ -11,6 +11,7 @@ To train model:
 
 To extract_metrics:
 1. `cd src`
-2. `sbatch eval_batch.sh`
+2. `sbatch eval_batch_dundee.sh` for Dundee
+3. `sbatch eval_batch_ns.sh` for Natural Stories
 
-Analysis is performed for Natural Stories and Dundee corpora in `analysis/natural_stories_analysis.ipynb` and `analysis/dundee.ipynb` respectively
+Analysis is performed for Dundee and Natural Stories corpora in `analysis/dundee.ipynb` and `analysis/natural_stories_analysis.ipynb` respectively
