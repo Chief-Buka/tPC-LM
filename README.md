@@ -2,7 +2,7 @@
 
 Code and publicly available data for modeling sentence processing using temporal predictive coding.
 
-**Create conda environment:** conda env create -f tpc.yml
+**Create conda environment:** `conda env create -f tpc.yml`
 
 
 To train model:
