@@ -45,7 +45,7 @@ def run_crossval(indices : Tuple[List, List], df : pd.DataFrame, predictor_list 
             training_data = training_data[predictor_names + [response_column]].dropna()
             test_data = test_data[predictor_names + [response_column]].dropna()
             train_x, train_y, test_x, test_y = np.array(training_data[predictor_names]), np.array(training_data[response_column]), np.array(test_data[predictor_names]), np.array(test_data[response_column])
-            baseline = fit_gam(training_data, predictor, response_column num_spillover = num_spillover, return_predictors = False, linear = is_linear, baseline = True)
+            baseline = fit_gam(training_data, predictor, response_column, num_spillover = num_spillover, return_predictors = False, linear = is_linear, baseline = True)
             delta_loglik[predictor].append((calc_loglik(model, test_x, train_x, train_y, test_y) \
                                             - calc_loglik(baseline, test_x, train_x, train_y, test_y)))
         print(f"Average Delta LogLik: {np.mean(delta_loglik[predictor])}")
