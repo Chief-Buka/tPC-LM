@@ -29,7 +29,8 @@ color_mapping = {
 }
 
 
-def run_crossval(indices : Tuple[List, List], df : pd.DataFrame, predictor_list : List[str], surprisal_spillover : int, is_linear : bool) -> Dict[str, List[float]]:
+def run_crossval(indices : Tuple[List, List], df : pd.DataFrame, predictor_list : List[str], response_column : str,
+                  surprisal_spillover : int, is_linear : bool) -> Dict[str, List[float]]:
     delta_loglik = {}
     for predictor in predictor_list:
         print(f"Running 10-fold CV for {predictor}")
@@ -40,11 +41,11 @@ def run_crossval(indices : Tuple[List, List], df : pd.DataFrame, predictor_list 
             num_spillover = 0
             if "surprisal" in predictor:
                 num_spillover = surprisal_spillover
-            model, predictor_names = fit_gam(training_data, predictor, num_spillover = num_spillover, return_predictors = True, linear = is_linear, baseline = False)
-            training_data = training_data[predictor_names + ['RT']].dropna()
-            test_data = test_data[predictor_names + ['RT']].dropna()
-            train_x, train_y, test_x, test_y = np.array(training_data[predictor_names]), np.array(training_data['RT']), np.array(test_data[predictor_names]), np.array(test_data['RT'])
-            baseline = fit_gam(training_data, predictor, num_spillover = num_spillover, return_predictors = False, linear = is_linear, baseline = True)
+            model, predictor_names = fit_gam(training_data, predictor, response_column, num_spillover = num_spillover, return_predictors = True, linear = is_linear, baseline = False)
+            training_data = training_data[predictor_names + [response_column]].dropna()
+            test_data = test_data[predictor_names + [response_column]].dropna()
+            train_x, train_y, test_x, test_y = np.array(training_data[predictor_names]), np.array(training_data[response_column]), np.array(test_data[predictor_names]), np.array(test_data[response_column])
+            baseline = fit_gam(training_data, predictor, response_column num_spillover = num_spillover, return_predictors = False, linear = is_linear, baseline = True)
             delta_loglik[predictor].append((calc_loglik(model, test_x, train_x, train_y, test_y) \
                                             - calc_loglik(baseline, test_x, train_x, train_y, test_y)))
         print(f"Average Delta LogLik: {np.mean(delta_loglik[predictor])}")
@@ -68,18 +69,17 @@ def build_TermList(baseline : bool, num_spillover : int, is_linear : bool) -> Te
             term_list += te(i, i + 1, spline_order = 3)
     return term_list
 
-def fit_gam(df : pd.DataFrame, predictor_name : str, num_spillover : int,
+def fit_gam(df : pd.DataFrame, predictor_name : str, response_name : str, num_spillover : int,
                      return_predictors : bool, linear : bool, baseline : bool):
     predictors = []
     predictors += [predictor_name] + [f'prev_{predictor_name}_{i}' for i in range(1, num_spillover + 1)]
     predictors += ['word_length', 'log_freq'] + \
         np.array([[f'prev_len_{i}', f'prev_freq_{i}'] for i in range(1, num_spillover + 1)]).flatten().tolist()
     # the features are based on the indices of the predictors
-    rt_column = 'RT'
-    model_data = df[predictors + [rt_column]].dropna()
+    model_data = df[predictors + [response_name]].dropna()
     standardizer = StandardScaler()
     X = standardizer.fit_transform(np.array(model_data[predictors]))
-    y = np.array(model_data[rt_column])
+    y = np.array(model_data[response_name])
     terms = build_TermList(baseline, num_spillover, linear)
     if linear:
         gam = LinearGAM(terms)
