@@ -23,7 +23,7 @@ If you use any part of the implementation, please cite us at:
 @article{ohams2025predictive,
   title={A Predictive Coding Model for Online Sentence Processing},
   author={Ohams, Chiebuka and Nair, Sathvik and Bhattasali, Shohini and Resnik, Philip},
-  year={2025},
-  publisher={OSF}
+  year={2026},
+  publisher={Journal of Memory and Language}
 }
 ```
