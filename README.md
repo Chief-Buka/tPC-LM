@@ -20,10 +20,18 @@ RTs for the Dundee corpus are averaged gaze durations provided by [Wilcox et al.
 
 If you use any part of the implementation, please cite us at:
 ```
-@article{ohams2025predictive,
-  title={A Predictive Coding Model for Online Sentence Processing},
-  author={Ohams, Chiebuka and Nair, Sathvik and Bhattasali, Shohini and Resnik, Philip},
-  year={2026},
-  publisher={Journal of Memory and Language}
-}
+@article{OHAMS2026104705,
+	abstract = {Computational approaches to prediction in online sentence processing tend to be dominated by computation-level surprisal theory, offering few insights into underlying cognitive mechanisms. Conversely, predictive coding is an algorithmic theory grounded in neuroscience, but it has rarely been employed in the study of language processing, in part because its areas of application have not involved sequential processing. Building on a recently proposed temporal predictive coding model, we present what is to our knowledge the first exploration of sequential predictive coding in broad-coverage online sentence processing. We investigate our model at non-toy scale using naturally occurring language, establishing its cognitive validity via comparison with reading times, and we link measurable aspects of the model to cognitive discussions of mechanism for prediction in language processing. Our results suggest that sequential predictive coding models are a valuable complement to surprisal theory as a route to progress on process-oriented theories of language comprehension.},
+	author = {Chiebuka Ohams and Sathvik Nair and Shohini Bhattasali and Philip Resnik},
+	doi = {https://doi.org/10.1016/j.jml.2025.104705},
+	issn = {0749-596X},
+	journal = {Journal of Memory and Language},
+	keywords = {Predictive coding, Incremental sentence processing, Prediction in language processing},
+	pages = {104705},
+	title = {A predictive coding model for online sentence processing},
+	url = {https://www.sciencedirect.com/science/article/pii/S0749596X25000981},
+	volume = {146},
+	year = {2026},
+	bdsk-url-1 = {https://www.sciencedirect.com/science/article/pii/S0749596X25000981},
+	bdsk-url-2 = {https://doi.org/10.1016/j.jml.2025.104705}}
 ```
