@@ -18,6 +18,8 @@ Analysis is performed for Dundee and Natural Stories corpora in `analysis/dundee
 
 RTs for the Dundee corpus are averaged gaze durations provided by [Wilcox et al. (Cog Sci, 2020)](https://github.com/wilcoxeg/neural-networks-read-times) from their Google Drive link. RTs from the Natural Stories corpus are provided by [Futrell et al. (Language Resources & Evaluation, 2021)](https://github.com/languageMIT/naturalstories).
 
+Repo built with reference to [temporal predictive coding](https://github.com/C16Mftang/temporal-predictive-coding/tree/main).
+
 If you use any part of the implementation, please cite us at:
 ```
 @article{OHAMS2026104705,
